@@ -1,3 +1,5 @@
+library(ggplot2)
+
 ###Define the Pitch Visualization
 stadiumlength <- 120
 stadiumwidth <- 80

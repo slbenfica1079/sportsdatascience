@@ -1,5 +1,5 @@
 library(rjson)
-#library(jsonlite)
+#library(jsonlite) [you can try jsonlite::fromJSON(x,flatten=TRUE) to see what that does when reading in the JSON file]
 library(data.table)
 
 ####Obtain Competitions####
@@ -18,11 +18,11 @@ match.files <- list.files(path="C:\\Users\\sgopaladesikan\\Desktop\\open-data-ma
 
 matches.list <- list()
 for(i in 1:length(match.files)){
-  match.temp <- fromJSON(file=match.files[i]) ##Loop through each file and obtain the necessary match information
+  match.temp <- fromJSON(file=match.files[i]) ##Loop through each file which contains all the matches for a given competition and season and obtain the necessary match information
   
   matches <- lapply(match.temp, function(x) data.frame(t(unlist(x)),stringsAsFactors = FALSE))
-  matches.df <- rbindlist(matches,fill=TRUE)
-  matches.list[[i]] <- matches.df 
+  matches.df <- rbindlist(matches,fill=TRUE) #we use rbindlist instead of do.call(rbind,) because of column mismatch
+  matches.list[[i]] <- matches.df #this assigns matches.df to the matches.list list that we initialized 
   
 }
 
@@ -31,7 +31,7 @@ all.matches.df <- data.frame(rbindlist(matches.list,fill=TRUE)) ###Combines all 
 ###we are going to remove a lot of columns to just make our dataset clean
 columns.to.keep <- names(which(unlist(lapply(all.matches.df,function(x) length(which(is.na(x)))))==0))
 
-all.matches.clean <- all.matches.df[,columns.to.keep]
+all.matches.clean <- all.matches.df[,columns.to.keep] #this selects the columns by column name 
 all.matches.clean$match_week <- as.numeric(all.matches.clean$match_week) #convert some variables to numeric
 all.matches.clean$home_score <- as.numeric(all.matches.clean$home_score)
 all.matches.clean$away_score <- as.numeric(all.matches.clean$away_score)
@@ -65,6 +65,7 @@ for(i in 1:length(event.files)){
 
   pass.index <- which(unlist(lapply(event.temp,function(x) x$type$name))=="Pass")
   
+  #obtain the passes just for team1 (the first element in teamids)
   pass.team1 <- pass.index[which(unlist(lapply(pass.index,function(x) event.temp[[x]]$team$id))==teamids[1])]
   
   pass.team1.df <- data.frame(matrix(NA,nrow=1,ncol=11))
@@ -136,10 +137,10 @@ for(i in 1:length(event.files)){
 matches.wsl.1819 <- all.matches.clean[which(all.matches.clean$competition.competition_id==37 & all.matches.clean$season.season_id==4),]
 matches.wsl.1819 <- matches.wsl.1819[order(matches.wsl.1819$match_week),]
 
-wsl.teams <- unique(matches.wsl.1819$home_team.home_team_name)
+wsl.teams <- unique(matches.wsl.1819$home_team.home_team_name) #get the unique list of teams so we can loop through each team
 
-squad.rotation.list <- list()
-team.starting.x11 <- list()
+squad.rotation.list <- list() #this list is for keeping track of the number of squad rotations per matchweek
+team.starting.x11 <- list() #this list is for keeping track of the starting 11 for each match week
 for(w in 1:length(wsl.teams)){
   squad.rotation.list[[wsl.teams[w]]] <- list()
   team.starting.x11[[wsl.teams[w]]] <- list()
@@ -155,7 +156,7 @@ for(w in 1:length(wsl.teams)){
                         ifelse(team.matches$Team.GD==0,"D","L"))
   
   
-  for(i in 1:length(team.events)){
+  for(i in 1:length(team.events)){ #for each game of that particular team, get the starting 11 for them
     starting.x11 <- team.events[[i]][[1]]
     starting.x11.index <- which(lapply(starting.x11, function(x) unique(x$team_id))==team.id)
     
@@ -164,19 +165,22 @@ for(w in 1:length(wsl.teams)){
   }
   
   num.matches <- length(team.events)
+  #for all the matches after the first match, calculate the difference in players from matchweek X and matchweek X+1
   squad.rotation <- c(0,sapply(seq(1:(num.matches-1)),function(x) length(setdiff(team.starting.x11[[w]][[x]],team.starting.x11[[w]][[x+1]]))))
   team.matches$Rotated <- squad.rotation 
   squad.rotation.list[[w]] <- team.matches[,c("match_week","Result","Rotated")]
 }
 
-result.colors <- c("W"="forestgreen","L"="red","D" = "yellow")
+result.colors <- c("W"="forestgreen","L"="red","D" = "yellow") #define a set of colors to use in our plot
+
+#ggplot is where you bind the data. the aes stands for aesthetic and defines what data is bound to what part of the graph
 ggplot(data=squad.rotation.list[[1]], aes(x=match_week,y=Rotated,fill=Result)) + geom_bar(stat="identity",width=0.5)+
   scale_fill_manual(values=result.colors)
 
-all.squad.rotations <- plyr::ldply(squad.rotation.list,.id="Team")
+all.squad.rotations <- plyr::ldply(squad.rotation.list,.id="Team") #binds all the rows of the list elements together and adds the list element name as an additional column
 
 ggplot(data=all.squad.rotations, aes(x=match_week,y=Rotated,fill=Result)) + geom_bar(stat="identity",width=0.5)+
-  scale_fill_manual(values=result.colors) + facet_grid(rows=vars(Team))
+  scale_fill_manual(values=result.colors) + facet_grid(rows=vars(Team)) #adds a plot for each team
 
 
 ####Analysis 2: Clustering Passes####
@@ -199,8 +203,8 @@ for(i in 1:length(pass.events.index)){
 }
 
 full.pass.df <- do.call(rbind,passes.list)
-full.pass.df <- full.pass.df[which(full.pass.df$Y.Receive<=80),]
-full.pass.df$Y.Pass <- 80 - full.pass.df$Y.Pass
+full.pass.df <- full.pass.df[which(full.pass.df$Y.Receive<=80),] #cleaning the data
+full.pass.df$Y.Pass <- 80 - full.pass.df$Y.Pass #changing the axis so that origin starts at the lower left corner
 full.pass.df$Y.Receive <- 80 - full.pass.df$Y.Receive
 
 
@@ -208,19 +212,22 @@ full.pass.df$Y.Receive <- 80 - full.pass.df$Y.Receive
 library(parallel)
 library(ggplot2)
 
+#perform k-means on the dataset (removing the 1st column because we just need to use the last 4 columns in our analysis)
 mc = mclapply(c(25,50,75), function(x,centers) kmeans(x, centers, iter.max=1000), x=full.pass.df[,-1])
 
-full.pass.df$Cluster.25 <- mc[[1]]$cluster
-full.pass.df$Cluster.50 <- mc[[2]]$cluster
-full.pass.df$Cluster.75 <- mc[[3]]$cluster
+full.pass.df$Cluster.25 <- mc[[1]]$cluster #created clusters using 25 clusters
+full.pass.df$Cluster.50 <- mc[[2]]$cluster #created clusters using 50 clusters
+full.pass.df$Cluster.75 <- mc[[3]]$cluster #created clusters using 75 clusters
 
 cluster.50.summary <- full.pass.df %>% group_by(Cluster.50) %>% summarise(X.Pass = mean(X.Pass),Y.Pass = mean(Y.Pass),
                                                                           X.Receive = mean(X.Receive), Y.Receive = mean(Y.Receive),
-                                                                          count = n())
+                                                                          count = n()) #obtain for each cluster id, the average location of the pass
 
-cluster.50.team.summary <- full.pass.df %>% group_by(Cluster.50,team_id) %>% summarise(count = n())
+cluster.50.team.summary <- full.pass.df %>% group_by(Cluster.50,team_id) %>% summarise(count = n()) #get a count per team
 arsenal.clusters <- cluster.50.team.summary %>% group_by(Cluster.50) %>% mutate(z.score = (count - mean(count))/sd(count)) %>%
-  filter(team_id == 968 & z.score >= 1.5)
+  filter(team_id == 968 & z.score >= 1.5) #identify which clusters that arsenal does more than 1.5 sd than the league average
+
+source("C:\\Users\\sgopaladesikan\\Desktop\\Friends of Tracking\\Draw_Pitch.R") #load in hori5, which contains the soccer field
 
 hori5 + geom_segment(data=cluster.50.summary, aes(x=X.Pass,xend=X.Receive,
                                                   y=Y.Pass,yend=Y.Receive,color=count),size=1.5,arrow=arrow(length = unit(0.03, "npc"))) +
