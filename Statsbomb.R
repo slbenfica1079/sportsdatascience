@@ -120,7 +120,7 @@ for(i in 1:length(event.files)){
   pass.team2.df <- pass.team2.df %>% group_by(Possession) %>% mutate(seq = row_number())
   pass.team2.df$team_id <- teamids[2]
   
-  
+  pass.list <- list(pass.team1.df,pass.team2.df)
   
   match.id <- strsplit(basename(event.files[i]),"[.]")[[1]][1]
   
@@ -144,30 +144,30 @@ team.starting.x11 <- list() #this list is for keeping track of the starting 11 f
 for(w in 1:length(wsl.teams)){
   squad.rotation.list[[wsl.teams[w]]] <- list()
   team.starting.x11[[wsl.teams[w]]] <- list()
-  team.matches <- matches.wsl.1819[which(matches.wsl.1819$home_team.home_team_name==wsl.teams[w] | 
+  team.matches <- matches.wsl.1819[which(matches.wsl.1819$home_team.home_team_name==wsl.teams[w] |
                            matches.wsl.1819$away_team.away_team_name==wsl.teams[w]),]
   team.matches$GD <- team.matches$home_score-team.matches$away_score
-  
+
   team.events.index <- which(names(event.list) %in% team.matches$match_id)
   team.events <- event.list[team.events.index]
   team.id <- unique(matches.wsl.1819[which(matches.wsl.1819$home_team.home_team_name==wsl.teams[w]),]$home_team.home_team_id)
   team.matches$Team.GD <- ifelse(team.matches$home_team.home_team_id==team.id,team.matches$GD,team.matches$GD*-1)
   team.matches$Result <- ifelse(team.matches$Team.GD>0,"W",
                         ifelse(team.matches$Team.GD==0,"D","L"))
-  
-  
+
+
   for(i in 1:length(team.events)){ #for each game of that particular team, get the starting 11 for them
     starting.x11 <- team.events[[i]][[1]]
     starting.x11.index <- which(lapply(starting.x11, function(x) unique(x$team_id))==team.id)
-    
+
     team.11 <- starting.x11[[starting.x11.index]]
     team.starting.x11[[wsl.teams[w]]][[i]] <- team.11$player.name
   }
-  
+
   num.matches <- length(team.events)
   #for all the matches after the first match, calculate the difference in players from matchweek X and matchweek X+1
   squad.rotation <- c(0,sapply(seq(1:(num.matches-1)),function(x) length(setdiff(team.starting.x11[[w]][[x]],team.starting.x11[[w]][[x+1]]))))
-  team.matches$Rotated <- squad.rotation 
+  team.matches$Rotated <- squad.rotation
   squad.rotation.list[[w]] <- team.matches[,c("match_week","Result","Rotated")]
 }
 
@@ -193,11 +193,11 @@ pass.events.index <- which(names(event.list) %in% matches.wsl.1819$match_id)
 passes.list <- list()
 for(i in 1:length(pass.events.index)){
   match.temp <- event.list[[pass.events.index[i]]][[2]]
-  
+
   all.passes <- do.call(rbind,match.temp)
-  
+
   all.passes.locations <- all.passes[,c("team_id","X.Pass","Y.Pass","X.Receive","Y.Receive")]
-  
+
   passes.list[[i]] <- all.passes.locations
 
 }
@@ -245,4 +245,4 @@ hori5 + geom_segment(data=full.pass.df[which(full.pass.df$Cluster.50==12 & full.
 
 
 
-####To Try At Home: Obtain the Shot Information for each match and create a xG shot graph 
+####To Try At Home: Obtain the Shot Information for each match and create a xG shot graph
